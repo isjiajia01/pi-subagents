@@ -1408,7 +1408,7 @@ describe("subagent extension child mode", () => {
 		}
 	});
 
-	it("keeps view-only slash reports visible but excludes them from every model request", () => {
+	it("keeps view-only slash reports visible but excludes new ones from every model request", () => {
 		const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "slash-context-agent-"));
 		const script = String.raw`
 			import assert from "node:assert/strict";
@@ -1444,7 +1444,8 @@ describe("subagent extension child mode", () => {
 			const workResult = { role: "custom", customType: "subagent-slash-result", content: "Worker finished", timestamp: 3 };
 			const unrelated = { role: "custom", customType: "other-extension", content: "Keep this", timestamp: 4 };
 			const assistant = { role: "assistant", content: [{ type: "text", text: "subagent-slash-text-result" }], timestamp: 5 };
-			const messages = [report, user, workResult, unrelated, assistant, { ...report, content: "Second report" }];
+			const historical = { role: "custom", customType: "subagent-slash-text-result", content: "Report stored before the update", display: true, timestamp: 0 };
+			const messages = [historical, report, user, workResult, unrelated, assistant, { ...report, content: "Second report" }];
 			async function modelContext(input) {
 				let current = input;
 				for (const handler of handlers.get("context") ?? []) {
@@ -1453,10 +1454,10 @@ describe("subagent extension child mode", () => {
 				}
 				return current;
 			}
-			const expected = [user, workResult, unrelated, assistant];
+			const expected = [historical, user, workResult, unrelated, assistant];
 			assert.deepEqual(await modelContext(messages), expected);
 			assert.deepEqual(await modelContext(messages), expected, "persisted reports stay excluded on later requests and resume");
-			assert.equal(messages.length, 6, "filtering must not mutate the stored transcript");
+			assert.equal(messages.length, 7, "filtering must not mutate the stored transcript");
 			assert.deepEqual(await modelContext([]), []);
 			assert.deepEqual(await modelContext(expected), expected);
 		`;
